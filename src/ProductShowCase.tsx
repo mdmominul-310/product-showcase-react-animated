@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const products = [
@@ -33,28 +33,99 @@ const products = [
 
 export default function ProductShowcase() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const lastWheelTime = useRef(0); // Track last wheel event to manage frequency
+  //   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isTouchpad = useRef(false); // Track if device is a touchpad
+  const wheelDeltaY = useRef(0); // Track the deltaY for finer control
+  const scrollInProgress = useRef(false); // To track ongoing scroll behavior
 
+  // Detect if touchpad is used
   useEffect(() => {
-    const handleWheel = (event: { deltaY: number }) => {
-      if (event.deltaY > 0) {
+    const testTouchpad = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) < 10 && event.deltaMode === 0) {
+        isTouchpad.current = true; // Detect touchpad by deltaY and deltaMode
+      }
+    };
+    window.addEventListener("wheel", testTouchpad);
+    return () => {
+      window.removeEventListener("wheel", testTouchpad);
+    };
+  }, []);
+
+  // Handle mouse/touchpad scroll
+  const handleWheel = (event: WheelEvent) => {
+    if (scrollInProgress.current) return; // Block if scroll is already in progress
+
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastWheelTime.current;
+
+    if (timeDiff < 100) return; // Prevent rapid scroll
+
+    wheelDeltaY.current = event.deltaY;
+
+    // Check if scroll value is significant enough to trigger a change
+    if (Math.abs(wheelDeltaY.current) > 20) {
+      scrollInProgress.current = true; // Start scroll action
+
+      if (wheelDeltaY.current > 0) {
         setActiveIndex((prev) => (prev + 1) % products.length);
       } else {
         setActiveIndex(
           (prev) => (prev - 1 + products.length) % products.length
         );
       }
-    };
 
-    window.addEventListener("wheel", handleWheel);
-    return () => window.removeEventListener("wheel", handleWheel);
+      lastWheelTime.current = currentTime; // Update last wheel event time
+      setTimeout(() => {
+        scrollInProgress.current = false; // Allow further scroll after timeout
+      }, 500); // Adjust the timeout duration as needed
+    }
+  };
+
+  // Handle touch events for mobile (swipe detection)
+  const handleTouchStart = (event: TouchEvent) => {
+    const touch = event.touches[0];
+    lastWheelTime.current = touch.pageY;
+  };
+
+  const handleTouchMove = (event: TouchEvent) => {
+    const touch = event.touches[0];
+    const touchEnd = touch.pageY;
+    const touchDiff = lastWheelTime.current - touchEnd;
+
+    if (Math.abs(touchDiff) > 50) {
+      if (touchDiff > 0) {
+        setActiveIndex((prev) => (prev + 1) % products.length);
+      } else {
+        setActiveIndex(
+          (prev) => (prev - 1 + products.length) % products.length
+        );
+      }
+      lastWheelTime.current = touchEnd; // Update touch start position
+    }
+  };
+
+  // Smooth transition for product change
+  useEffect(() => {
+    window.addEventListener("wheel", handleWheel, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+    };
   }, []);
 
   return (
     <motion.div
       className="container"
       style={{ backgroundColor: products[activeIndex].bgColor }}
-      animate={{ backgroundColor: products[activeIndex].bgColor }}
-      transition={{ duration: 0.5 }}
+      layout
+      animate={{ opacity: 1 }} // Smooth fade transition
+      initial={{ opacity: 0 }} // Initial fade-in
+      transition={{ duration: 0.5 }} // Smooth fade transition duration
     >
       <div className="content">
         <div className="text-content">
