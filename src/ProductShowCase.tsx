@@ -170,6 +170,16 @@ export default function ProductShowcase() {
         </div>
         <div className="image-container">
           <AnimatePresence mode="wait">
+            <motion.div
+              className="glow"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, scale: 1.2 }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                repeatType: "reverse",
+              }}
+            ></motion.div>
             <motion.img
               key={products[activeIndex].image}
               src={products[activeIndex].image}
